@@ -9,9 +9,10 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
 
 ## 2. What the demo will show (live and public)
 - Runs **daily, automatically, for free** on GitHub Actions
-- Two real sources:
+- Three real sources:
   1. **books.toscrape.com**, a site made for scraping practice, so there are no terms-of-service issues: HTML scraping, pagination, price and stock tracking
-  2. **Banco Central do Brasil (PTAX) USD/BRL rate**, a free public API: JSON source with threshold alerts
+  2. **Banco Central do Brasil (PTAX)** USD and EUR rates, a free public API: JSON source with threshold alerts
+  3. **Kraken public API** BTC, ETH and SOL prices: data that really changes, so alerts fire in the live demo. CoinGecko was the first choice, but its robots.txt disallows `/api/v3`.
 - A **public dashboard** (static page on Vercel): latest values, price history charts, a change log, and "last run / runs so far" as proof it's alive
 - **Alerts** when a rule fires (see decision 3)
 
@@ -60,7 +61,7 @@ Python 3.12 · httpx · selectolax (fast HTML parsing) · pydantic · SQLite · 
 ```
 watchtower/
 ├── src/watchtower/
-│   ├── sources/        # base.py, books_toscrape.py, bcb_ptax.py
+│   ├── sources/        # base.py, books_toscrape.py, bcb_ptax.py, kraken.py
 │   ├── models.py       # pydantic records
 │   ├── storage.py      # SQLite repository
 │   ├── rules.py        # diff + rule engine
@@ -83,7 +84,7 @@ watchtower/
 
 ## 7. Decisions (Davi, 2026-10-21)
 1. **Name:** Watchtower
-2. **Sources:** books.toscrape + BCB PTAX
-3. **Alerts:** no Telegram. Proposed: **GitHub Issues** for the live demo (GitHub emails the alert; zero secrets), plus **email (SMTP)** and **webhook** notifiers built for client use. *Waiting for Davi's confirmation.*
+2. **Sources:** books.toscrape + BCB PTAX + Kraken (swapped in for CoinGecko, whose robots.txt blocks its API)
+3. **Alerts:** no Telegram. Proposed: **GitHub Issues** for the live demo (GitHub emails the alert; zero secrets), plus **email (SMTP)** and **webhook** notifiers built for client use. Confirmed.
 4. **Storage:** SQLite
 5. **Repo:** public, `odavicoelho/watchtower`

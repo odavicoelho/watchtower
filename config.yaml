@@ -15,6 +15,9 @@ sources:
   - type: bcb_ptax
     options:
       currencies: [USD, EUR]
+  - type: kraken
+    options:
+      pairs: [XBTUSD, ETHUSD, SOLUSD]
 
 # Rules: optional `source` / `key` limit a rule to one source or one item.
 rules:
@@ -26,6 +29,10 @@ rules:
     options: {source: bcb_ptax, key: USD, above: 5.10, below: 4.90}
   - type: value_rise  # a sharp daily jump in any currency
     options: {source: bcb_ptax, min_percent: 1.5}
+  - type: value_rise  # crypto moves fast: alert on big daily swings both ways
+    options: {source: kraken, min_percent: 5}
+  - type: price_drop
+    options: {source: kraken, min_percent: 5}
 
 # Notifiers. Secrets always come from environment variables, never from this file.
 #   github_issue: GITHUB_TOKEN + GITHUB_REPOSITORY (set automatically inside GitHub Actions)
