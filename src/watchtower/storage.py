@@ -12,6 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from watchtower.models import Record
+from watchtower.rules import Alert
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -43,6 +44,19 @@ CREATE TABLE IF NOT EXISTS observations (
     unit        TEXT,
     attributes  TEXT NOT NULL,  -- JSON
     PRIMARY KEY (source, key, observed_on)
+);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id         INTEGER PRIMARY KEY,
+    run_id     INTEGER NOT NULL REFERENCES runs(id),
+    created_on TEXT NOT NULL,
+    rule       TEXT NOT NULL,
+    source     TEXT NOT NULL,
+    key        TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    message    TEXT NOT NULL,
+    url        TEXT,
+    UNIQUE (created_on, rule, source, key)  -- one alert per item per rule per day
 );
 """
 
@@ -115,6 +129,26 @@ class Storage:
                 rows,
             )
         return len(rows)
+
+    def save_alerts(self, alerts: Iterable[Alert], run_id: int, created_on: str) -> list[Alert]:
+        """Store alerts and return only the ones not already raised today, so reruns never alert twice."""
+        fresh = []
+        with self._db:
+            for a in alerts:
+                cursor = self._db.execute(
+                    """
+                    INSERT INTO alerts (run_id, created_on, rule, source, key, name, message, url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (created_on, rule, source, key) DO NOTHING
+                    """,
+                    (run_id, created_on, a.rule, a.source, a.key, a.name, a.message, a.url),
+                )
+                if cursor.rowcount == 1:
+                    fresh.append(a)
+        return fresh
+
+    def alerts(self, limit: int = 100) -> list[sqlite3.Row]:
+        return self._db.execute("SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
 
     def latest(self, source: str, before: str | None = None) -> dict[str, Observation]:
         """Most recent observation of every item of a source, optionally strictly before a day."""

@@ -18,11 +18,23 @@ class SourceConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+class RuleConfig(BaseModel):
+    type: str
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotifierConfig(BaseModel):
+    type: str
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
 class Config(BaseModel):
     user_agent: str = "watchtower/0.1 (+https://github.com/odavicoelho/watchtower)"
     database: Path = Path("data/watchtower.db")
     http: HttpSettings = Field(default_factory=HttpSettings)
     sources: list[SourceConfig]
+    rules: list[RuleConfig] = Field(default_factory=list)
+    notifiers: list[NotifierConfig] = Field(default_factory=list)
 
 
 def load(path: str | Path) -> Config:

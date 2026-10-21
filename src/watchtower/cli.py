@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from watchtower import config as config_module
-from watchtower import pipeline, sources
+from watchtower import notifiers, pipeline, rules, sources
 from watchtower.http import HttpClient
 from watchtower.storage import Storage
 
@@ -27,6 +27,8 @@ def run(config: ConfigOption = Path("config.yaml")) -> None:
     """Fetch every configured source once and store the results."""
     cfg = config_module.load(config)
     configured = [sources.create(s.type, s.options) for s in cfg.sources]
+    configured_rules = [rules.create(r.type, r.options) for r in cfg.rules]
+    configured_notifiers = [notifiers.create(n.type, n.options) for n in cfg.notifiers]
     storage = Storage(cfg.database)
     http = HttpClient(
         user_agent=cfg.user_agent,
@@ -36,7 +38,9 @@ def run(config: ConfigOption = Path("config.yaml")) -> None:
         delay=cfg.http.delay_seconds,
     )
     try:
-        result = pipeline.run(configured, storage=storage, http=http)
+        result = pipeline.run(
+            configured, storage=storage, http=http, rules=configured_rules, notifiers=configured_notifiers
+        )
     finally:
         http.close()
         storage.close()
@@ -44,7 +48,9 @@ def run(config: ConfigOption = Path("config.yaml")) -> None:
     for r in result.sources:
         line = f"  {r.source:<20} {r.status:<7} {r.items:>5} items  {r.duration_ms / 1000:.1f}s"
         typer.echo(line + (f"  ({r.error})" if r.error else ""))
-    typer.echo(f"run {result.run_id}: {result.status}")
+    typer.echo(f"run {result.run_id}: {result.status}, {len(result.alerts)} new alerts")
+    for failure in result.notify_failures:
+        typer.echo(f"  notifier failed: {failure}", err=True)
     if result.status != "ok":
         raise typer.Exit(code=1)
 

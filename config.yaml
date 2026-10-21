@@ -12,3 +12,17 @@ sources:
   - type: books_toscrape
     options:
       max_pages: 50  # the whole catalogue: 1,000 books
+
+# Rules: optional `source` / `key` limit a rule to one source or one item.
+rules:
+  - type: price_drop
+    options: {min_percent: 10}
+  - type: new_item
+  - type: stock_change
+
+# Notifiers. Secrets always come from environment variables, never from this file.
+#   github_issue: GITHUB_TOKEN + GITHUB_REPOSITORY (set automatically inside GitHub Actions)
+#   email:        WATCHTOWER_SMTP_USER + WATCHTOWER_SMTP_PASSWORD (+ optional _HOST, _PORT)
+#   webhook:      WATCHTOWER_WEBHOOK_URL
+notifiers:
+  - type: console

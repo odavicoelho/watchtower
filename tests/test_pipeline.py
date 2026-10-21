@@ -54,3 +54,41 @@ def test_all_sources_failing_fails_the_run(http: HttpClient) -> None:
     result = pipeline.run([BrokenSource()], storage=db, http=http, now=lambda: NOW)
 
     assert result.status == "failed"
+
+
+class PriceSource(Source):
+    """Returns whatever prices the test sets, to simulate a site changing between days."""
+
+    name = "prices"
+
+    def __init__(self) -> None:
+        self.prices: dict[str, str] = {}
+
+    def fetch(self, http: HttpClient) -> list[Record]:
+        return [Record(source=self.name, key=k, name=k, value=Decimal(v)) for k, v in self.prices.items()]
+
+
+def test_changes_between_days_raise_alerts_and_notify_once(http: HttpClient) -> None:
+    from tests.test_notifiers import Recorder
+    from watchtower.rules import NewItem, PriceDrop
+
+    db = Storage(":memory:")
+    source, recorder = PriceSource(), Recorder()
+    rules = [PriceDrop(min_percent=10), NewItem()]
+    day1 = datetime(2026, 10, 21, 9, tzinfo=UTC)
+    day2 = datetime(2026, 10, 22, 9, tzinfo=UTC)
+
+    source.prices = {"a": "10", "b": "20"}
+    first = pipeline.run([source], storage=db, http=http, rules=rules, notifiers=[recorder], now=lambda: day1)
+
+    source.prices = {"a": "8", "b": "20", "c": "5"}
+    second = pipeline.run(
+        [source], storage=db, http=http, rules=rules, notifiers=[recorder], now=lambda: day2
+    )
+    rerun = pipeline.run([source], storage=db, http=http, rules=rules, notifiers=[recorder], now=lambda: day2)
+
+    assert first.alerts == []  # baseline day
+    assert sorted((a.rule, a.key) for a in second.alerts) == [("new_item", "c"), ("price_drop", "a")]
+    assert rerun.alerts == []  # same-day rerun never alerts twice
+    assert recorder.sent == ["Watchtower: 2 alerts on 2026-10-22"]
+    assert len(db.alerts()) == 2
