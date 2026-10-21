@@ -76,7 +76,7 @@ watchtower/
 
 ## 6. Milestones (~5–7 days of work)
 1. Skeleton, models, books.toscrape source, SQLite storage, CLI `run` → data in the DB
-2. Diff + rules + console and Telegram notifiers
+2. Diff + rules + console, GitHub Issues, email and webhook notifiers
 3. BCB PTAX source + threshold rule
 4. Dashboard + Vercel deploy
 5. GitHub Actions daily run + CI, tests, README with diagram → **release**, then add to site, LinkedIn and Fiverr gig 1
