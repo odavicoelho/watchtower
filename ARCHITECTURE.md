@@ -1,6 +1,6 @@
 # P2 · Watchtower: architecture proposal
 
-> Status: **proposal, waiting for Davi's review.** No code until approved.
+> Status: **approved 2026-10-21.** Milestone 1 done.
 
 ## 1. What it is
 A small, production-style **web monitoring pipeline**. On a schedule, it collects data from websites and APIs, stores the full history, detects changes (price drops, new items, items out of stock, value thresholds), sends alerts, and publishes a public dashboard.
@@ -13,7 +13,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
   1. **books.toscrape.com**, a site made for scraping practice, so there are no terms-of-service issues: HTML scraping, pagination, price and stock tracking
   2. **Banco Central do Brasil (PTAX) USD/BRL rate**, a free public API: JSON source with threshold alerts
 - A **public dashboard** (static page on Vercel): latest values, price history charts, a change log, and "last run / runs so far" as proof it's alive
-- **Telegram alerts** (free bot) when a rule fires
+- **Alerts** when a rule fires (see decision 3)
 
 ## 3. Architecture
 
@@ -24,7 +24,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
                                ▼
 ┌─────────┐   ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌─────────┐
 │ Sources │──▶│ Validate │──▶│  Store   │──▶│  Diff + │──▶│ Notify  │
-│ (fetch) │   │ normalize│   │ (SQLite) │   │  rules  │   │ Telegram│
+│ (fetch) │   │ normalize│   │ (SQLite) │   │  rules  │   │ GH issue│
 └─────────┘   └──────────┘   └────┬─────┘   └─────────┘   │ webhook │
  HTML / API    pydantic           │ history                │ console │
  adapters      models             ▼                        └─────────┘
@@ -41,7 +41,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
 | **Validation** | Parse, type-check and normalize (prices, currencies, dates) | `pydantic` models: bad data fails loudly instead of corrupting history |
 | **Storage** | Append-only snapshots plus "latest state" per item | **SQLite**: zero setup, one file, versioned in the repo's data branch. Client projects can swap in PostgreSQL. |
 | **Diff + rules** | Compare each run with the previous one; evaluate rules (`price_drop >= 10%`, `new_item`, `out_of_stock`, `value > X`) | Rules declared in YAML, so they're changeable without code |
-| **Notifiers** | Deliver fired alerts | Telegram, generic webhook (Slack/Discord) and console; same interface, easy to add more |
+| **Notifiers** | Deliver fired alerts | GitHub Issues, email (SMTP), webhook (Slack/Discord) and console; same interface, easy to add more |
 | **Dashboard** | Static report generated after each run | Jinja2 + a small chart library → plain HTML. Free hosting, nothing to keep running |
 | **Scheduler** | Run daily | GitHub Actions cron. Free, and its logs are public proof the system works |
 
@@ -81,9 +81,9 @@ watchtower/
 4. Dashboard + Vercel deploy
 5. GitHub Actions daily run + CI, tests, README with diagram → **release**, then add to site, LinkedIn and Fiverr gig 1
 
-## 7. Decisions for Davi
-1. **Name:** "Watchtower", or something else?
-2. **Sources:** OK with books.toscrape plus BCB PTAX? Alternatively, a real public source closer to a business use case, if you know one that allows scraping.
-3. **Alerts:** Telegram (free, instant, needs you to create a bot with @BotFather, about 2 min) or webhook/console only?
-4. **Storage:** SQLite for the demo (my recommendation) or PostgreSQL from the start (more "enterprise", but needs a free hosted database)?
-5. **Repo:** public under `odavicoelho/watchtower`?
+## 7. Decisions (Davi, 2026-10-21)
+1. **Name:** Watchtower
+2. **Sources:** books.toscrape + BCB PTAX
+3. **Alerts:** no Telegram. Proposed: **GitHub Issues** for the live demo (GitHub emails the alert; zero secrets), plus **email (SMTP)** and **webhook** notifiers built for client use. *Waiting for Davi's confirmation.*
+4. **Storage:** SQLite
+5. **Repo:** public, `odavicoelho/watchtower`
