@@ -94,13 +94,18 @@ class GitHubIssue(Notifier):
     def __init__(self, labels: list[str] | None = None, env: Mapping[str, str] = os.environ) -> None:
         self.token = _required(env, "GITHUB_TOKEN")
         self.repository = _required(env, "GITHUB_REPOSITORY")
-        self.labels = labels or ["alert"]
+        # Labels must already exist in the repo, so none by default.
+        self.labels = labels or []
 
     def send(self, alerts: list[Alert], title: str) -> None:
         response = httpx.post(
             f"{self.API}/repos/{self.repository}/issues",
             headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json"},
-            json={"title": title, "body": _markdown(alerts), "labels": self.labels},
+            json={
+                "title": title,
+                "body": _markdown(alerts),
+                **({"labels": self.labels} if self.labels else {}),
+            },
             timeout=15,
         )
         response.raise_for_status()

@@ -13,7 +13,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
   1. **books.toscrape.com**, a site made for scraping practice, so there are no terms-of-service issues: HTML scraping, pagination, price and stock tracking
   2. **Banco Central do Brasil (PTAX)** USD and EUR rates, a free public API: JSON source with threshold alerts
   3. **Kraken public API** BTC, ETH and SOL prices: data that really changes, so alerts fire in the live demo. CoinGecko was the first choice, but its robots.txt disallows `/api/v3`.
-- A **public dashboard** (static page on Vercel): latest values, price history charts, a change log, and "last run / runs so far" as proof it's alive
+- A **public dashboard** (static page on GitHub Pages): latest values, price history charts, a change log, and "last run / runs so far" as proof it's alive
 - **Alerts** when a rule fires (see decision 3)
 
 ## 3. Architecture
@@ -43,7 +43,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
 | **Storage** | Append-only snapshots plus "latest state" per item | **SQLite**: zero setup, one file, versioned in the repo's data branch. Client projects can swap in PostgreSQL. |
 | **Diff + rules** | Compare each run with the previous one; evaluate rules (`price_drop >= 10%`, `new_item`, `out_of_stock`, `value > X`) | Rules declared in YAML, so they're changeable without code |
 | **Notifiers** | Deliver fired alerts | GitHub Issues, email (SMTP), webhook (Slack/Discord) and console; same interface, easy to add more |
-| **Dashboard** | Static report generated after each run | Jinja2 + a small chart library → plain HTML. Free hosting, nothing to keep running |
+| **Dashboard** | Static report generated after each run | Jinja2 + inline SVG sparklines → one HTML file. Free hosting on GitHub Pages, nothing to keep running |
 | **Scheduler** | Run daily | GitHub Actions cron. Free, and its logs are public proof the system works |
 
 ### Reliability (what makes it look professional)
@@ -55,7 +55,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
 - Lint and type checks (ruff, mypy) in CI
 
 ## 4. Stack
-Python 3.12 · httpx · selectolax (fast HTML parsing) · pydantic · SQLite · Typer (CLI) · Jinja2 · pytest · ruff · mypy · GitHub Actions · Vercel. **Cost: $0.**
+Python 3.12 · httpx · selectolax (fast HTML parsing) · pydantic · SQLite · Typer (CLI) · Jinja2 · pytest · ruff · mypy · GitHub Actions · GitHub Pages. **Cost: $0.**
 
 ## 5. Repo layout
 ```
@@ -79,7 +79,7 @@ watchtower/
 1. Skeleton, models, books.toscrape source, SQLite storage, CLI `run` → data in the DB
 2. Diff + rules + console, GitHub Issues, email and webhook notifiers
 3. BCB PTAX source + threshold rule
-4. Dashboard + Vercel deploy
+4. Dashboard + GitHub Pages deploy
 5. GitHub Actions daily run + CI, tests, README with diagram → **release**, then add to site, LinkedIn and Fiverr gig 1
 
 ## 7. Decisions (Davi, 2026-10-21)

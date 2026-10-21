@@ -28,7 +28,7 @@ def test_github_issue_uses_the_actions_token_and_repository() -> None:
     )
     env = {"GITHUB_TOKEN": "t0k3n", "GITHUB_REPOSITORY": "odavicoelho/watchtower"}
 
-    GitHubIssue(env=env).send(ALERTS, "Watchtower: 2 alerts")
+    GitHubIssue(labels=["alert"], env=env).send(ALERTS, "Watchtower: 2 alerts")
 
     request = route.calls.last.request
     assert request.headers["Authorization"] == "Bearer t0k3n"
@@ -81,3 +81,12 @@ def test_one_failing_channel_does_not_block_the_others() -> None:
 
     assert recorder.sent == ["Title"]
     assert failures == ["broken: ConnectionError: down"]
+
+
+@respx.mock
+def test_github_issue_sends_no_labels_by_default() -> None:
+    route = respx.post("https://api.github.com/repos/o/r/issues").mock(return_value=httpx.Response(201))
+
+    GitHubIssue(env={"GITHUB_TOKEN": "t", "GITHUB_REPOSITORY": "o/r"}).send(ALERTS, "Title")
+
+    assert "labels" not in json.loads(route.calls.last.request.content)

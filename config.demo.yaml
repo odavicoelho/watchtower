@@ -1,0 +1,40 @@
+# Configuration of the live demo, run daily by .github/workflows/daily.yml.
+# Same as config.yaml, plus GitHub Issue alerts; the bookstore is capped to keep the database small.
+user_agent: "watchtower/0.1 (+https://github.com/odavicoelho/watchtower)"
+database: data/watchtower.db
+
+http:
+  timeout: 20
+  retries: 3
+  backoff_seconds: 2
+  delay_seconds: 1
+
+sources:
+  - type: bcb_ptax
+    options:
+      currencies: [USD, EUR]
+  - type: kraken
+    options:
+      pairs: [XBTUSD, ETHUSD, SOLUSD]
+  - type: books_toscrape
+    options:
+      max_pages: 10  # 200 books
+
+rules:
+  - type: threshold
+    options: {source: bcb_ptax, key: USD, above: 5.10, below: 4.90}
+  - type: value_rise
+    options: {source: bcb_ptax, min_percent: 1.5}
+  - type: value_rise
+    options: {source: kraken, min_percent: 5}
+  - type: price_drop
+    options: {source: kraken, min_percent: 5}
+  - type: price_drop
+    options: {source: books_toscrape, min_percent: 10}
+  - type: new_item
+    options: {source: books_toscrape}
+  - type: stock_change
+
+notifiers:
+  - type: console
+  - type: github_issue  # GITHUB_TOKEN and GITHUB_REPOSITORY are provided by Actions
