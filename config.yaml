@@ -12,6 +12,9 @@ sources:
   - type: books_toscrape
     options:
       max_pages: 50  # the whole catalogue: 1,000 books
+  - type: bcb_ptax
+    options:
+      currencies: [USD, EUR]
 
 # Rules: optional `source` / `key` limit a rule to one source or one item.
 rules:
@@ -19,6 +22,10 @@ rules:
     options: {min_percent: 10}
   - type: new_item
   - type: stock_change
+  - type: threshold  # the dollar leaving its usual band
+    options: {source: bcb_ptax, key: USD, above: 5.10, below: 4.90}
+  - type: value_rise  # a sharp daily jump in any currency
+    options: {source: bcb_ptax, min_percent: 1.5}
 
 # Notifiers. Secrets always come from environment variables, never from this file.
 #   github_issue: GITHUB_TOKEN + GITHUB_REPOSITORY (set automatically inside GitHub Actions)
