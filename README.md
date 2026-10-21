@@ -7,7 +7,7 @@
 
 Watchtower is a monitoring pipeline I built. Every day it goes out to a few websites and APIs, collects their data, keeps the whole history, figures out what changed since yesterday and tells me when something important happens.
 
-The idea came from the kind of request I see all the time: "watch these competitor prices", "tell me when this is back in stock", "save this data to a database every morning". Those are all the same problem underneath, so I wanted one system that solves it properly, instead of a new script every time.
+The idea came from the kind of request that shows up all the time on freelance platforms: "watch these competitor prices", "tell me when this is back in stock", "save this data to a database every morning". Those are all the same problem underneath, so I wanted one system that solves it properly, instead of a new script every time.
 
 Right now it watches three public sources:
 
@@ -16,6 +16,27 @@ Right now it watches three public sources:
 | **Banco Central do Brasil (PTAX)** | Official USD and EUR exchange rates | Open-data JSON API |
 | **Kraken** | Live BTC, ETH and SOL prices | Public market-data API |
 | **books.toscrape.com** | Prices and stock of a bookstore catalogue | HTML scraping with pagination (a sandbox site made for scraping) |
+
+## Why this is valuable
+
+**The problem:** a lot of important information lives on websites that nobody has time to check every day. Competitor prices, supplier stock, exchange rates, public notices. Usually one of two things happens:
+- someone checks by hand, which is slow and boring, and sooner or later they forget or miss something, or
+- nobody checks, and you find out about the change when it's already too late to act.
+
+Even when someone does check, almost nobody writes it down. So there's no history, and history is exactly what you need to see a trend.
+
+**What Watchtower changes:**
+- **Nobody checks by hand anymore.** It runs every day at the same time, it doesn't get tired and it doesn't forget. If someone spends 30 minutes a day checking prices, that's around 11 hours a month back.
+- **You hear about a change when it happens,** not weeks later. A competitor drops a price, an item comes back in stock, the dollar crosses the rate you care about: you get an alert that day.
+- **You build a history that didn't exist before.** Most sites only show you *today*. After a few months, you have your own dataset: price trends, how often a competitor runs promotions, how the dollar moved before you closed a contract. That's data you can't go back and buy later.
+- **It costs almost nothing to run.** No server, no subscription. In this demo the whole thing runs on GitHub's free tier.
+
+**Who it's for:**
+- **Online stores and retailers** watching competitor prices and stock, so they can react the same day.
+- **Buyers and procurement teams** tracking supplier prices, to buy at the right moment.
+- **Businesses that import, export or invoice in dollars or euros,** with alerts when the exchange rate moves.
+- **Investors and regular people** who want to know when an asset, or that product they've been waiting for, hits their price.
+- **Analysts and researchers** who need a historical dataset from sources that only ever show the current value.
 
 ## The big picture
 
