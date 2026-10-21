@@ -22,6 +22,11 @@ class Alert:
     url: str | None = None
 
 
+def fmt(value: Decimal) -> str:
+    """Human-friendly number: at most 4 decimals, no trailing zeros (83778.40000 → 83778.4)."""
+    return f"{value.quantize(Decimal('0.0001')).normalize():f}"
+
+
 class Rule(ABC):
     type: ClassVar[str]
 
@@ -64,7 +69,7 @@ class ValueChange(Rule):
         if not moved:
             return None
         unit = f" {current.unit}" if current.unit else ""
-        return f"{previous.value}{unit} → {current.value}{unit} ({change:+.1f}%)"
+        return f"{fmt(previous.value)}{unit} → {fmt(current.value)}{unit} ({change:+.1f}%)"
 
 
 class PriceDrop(ValueChange):
@@ -122,9 +127,9 @@ class Threshold(Rule):
         before = None if previous is None else previous.value
         unit = f" {current.unit}" if current.unit else ""
         if self.above is not None and current.value > self.above and (before is None or before <= self.above):
-            return f"rose above {self.above}{unit}: now {current.value}{unit}"
+            return f"rose above {fmt(self.above)}{unit}: now {fmt(current.value)}{unit}"
         if self.below is not None and current.value < self.below and (before is None or before >= self.below):
-            return f"fell below {self.below}{unit}: now {current.value}{unit}"
+            return f"fell below {fmt(self.below)}{unit}: now {fmt(current.value)}{unit}"
         return None
 
 

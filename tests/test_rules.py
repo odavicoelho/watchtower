@@ -20,7 +20,7 @@ def rec(value: str | None = "10", key: str = "k", source: str = "shop", **attrib
 
 def test_price_drop_fires_at_or_beyond_the_threshold() -> None:
     rule = PriceDrop(min_percent=10)
-    assert rule.check(rec("10"), rec("9.00")) == "10 GBP → 9.00 GBP (-10.0%)"
+    assert rule.check(rec("10"), rec("9.00")) == "10 GBP → 9 GBP (-10.0%)"
     assert rule.check(rec("10"), rec("9.50")) is None
     assert rule.check(rec("10"), rec("12")) is None
 
@@ -55,6 +55,14 @@ def test_threshold_fires_once_per_crossing() -> None:
     assert rule.check(rec("5.20"), rec("5.35")) is not None  # crossed
     assert rule.check(rec("5.35"), rec("5.40")) is None  # still above: no repeat
     assert Threshold(below=5.0).check(rec("5.10"), rec("4.90")) is not None
+
+
+def test_messages_trim_noisy_decimals() -> None:
+    message = PriceDrop(min_percent=1).check(rec("96.46761"), rec("83778.40000"))
+    assert message is None  # a rise, not a drop
+    assert ValueRise(min_percent=1).check(rec("96.46761"), rec("83778.40000")) == (
+        "96.4676 GBP → 83778.4 GBP (+86746.1%)"
+    )
 
 
 def test_threshold_needs_a_bound() -> None:

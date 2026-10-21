@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watchtower · live monitoring</title>
+  <meta name="description" content="A production-style web monitoring pipeline, running daily on GitHub Actions.">
+  <style>
+    :root {
+      --bg: #0a0a0f; --card: #111118; --line: rgb(255 255 255 / .08); --fg: #e5e7eb; --muted: #9ca3af;
+      --accent: #a78bfa; --up: #4ade80; --down: #f87171; --warn: #fbbf24;
+      color-scheme: dark;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #fafafa; --card: #fff; --line: rgb(0 0 0 / .09); --fg: #18181b; --muted: #52525b;
+              --accent: #7c3aed; --up: #16a34a; --down: #dc2626; --warn: #b45309; color-scheme: light; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 1080px; margin: 0 auto; padding: 40px 16px 64px; }
+    a { color: var(--accent); }
+    h1 { font-size: 30px; margin: 0; letter-spacing: -.02em; }
+    h2 { font-size: 19px; margin: 0 0 4px; }
+    .mono { font-family: ui-monospace, "JetBrains Mono", monospace; }
+    .muted { color: var(--muted); }
+    .kicker { font: 12px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    header { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: end; margin-bottom: 28px; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); }
+    .dot.partial { background: var(--warn); } .dot.failed { background: var(--down); }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 36px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    .stat b { display: block; font-size: 24px; letter-spacing: -.02em; }
+    section { margin-bottom: 40px; }
+    .section-head { margin-bottom: 14px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .tile .value { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+    .tile .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .up { color: var(--up); } .down { color: var(--down); }
+    svg { display: block; width: 100%; height: 40px; margin-top: 10px; overflow: visible; }
+    svg path { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .table-wrap { overflow-x: auto; }
+    .tag { font: 12px ui-monospace, monospace; padding: 2px 8px; border-radius: 6px; background: rgb(167 139 250 / .14); color: var(--accent); white-space: nowrap; }
+    footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <p class="kicker">Live monitoring pipeline</p>
+      <h1>Watchtower</h1>
+      <p class="muted" style="margin:6px 0 0">Collects data from websites and APIs every day, keeps its history, detects changes and raises alerts.</p>
+    </div>
+    {% if last_run %}
+    <span class="pill"><span class="dot {{ last_run.status }}"></span>Last run {{ last_run.finished_at[:16] | replace("T", " ") }} UTC · {{ last_run.status }}</span>
+    {% endif %}
+  </header>
+
+  <div class="stats">
+    <div class="card stat"><span class="muted">Runs</span><b>{{ stats.runs }}</b></div>
+    <div class="card stat"><span class="muted">Days of history</span><b>{{ stats.days }}</b></div>
+    <div class="card stat"><span class="muted">Observations</span><b>{{ "{:,}".format(stats.observations) }}</b></div>
+    <div class="card stat"><span class="muted">Alerts raised</span><b>{{ stats.alerts }}</b></div>
+  </div>
+
+  {% for s in sections %}
+  <section>
+    <div class="section-head">
+      <h2>{{ s.title }}</h2>
+      <span class="muted">{{ s.description }}</span>
+    </div>
+    {% if s.summary %}
+    <div class="stats" style="margin-bottom:0">
+      <div class="card stat"><span class="muted">Items tracked</span><b>{{ "{:,}".format(s.summary["items"]) }}</b></div>
+      <div class="card stat"><span class="muted">In stock</span><b>{{ "{:,}".format(s.summary["in_stock"]) }}</b></div>
+      <div class="card stat"><span class="muted">Average price</span><b>{{ s.summary["average"] }} <small class="muted">{{ s.summary["unit"] }}</small></b></div>
+    </div>
+    {% else %}
+    <div class="tiles">
+      {% for t in s.tiles %}
+      <div class="card tile">
+        <div class="row">
+          <span>{% if t.url %}<a href="{{ t.url }}" rel="noopener">{{ t.name }}</a>{% else %}{{ t.name }}{% endif %}</span>
+          <span class="mono muted">{{ t.key }}</span>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span class="value">{{ t.value }} <small class="muted">{{ t.unit }}</small></span>
+          {% if t.change is not none %}
+          <span class="mono {{ 'up' if t.change > 0 else 'down' if t.change < 0 else 'muted' }}">{{ "%+.2f" | format(t.change) }}%</span>
+          {% endif %}
+        </div>
+        {% if t.sparkline %}<svg viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><path d="{{ t.sparkline }}"/></svg>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section>
+    <div class="section-head"><h2>Recent alerts</h2><span class="muted">Every change a rule caught, newest first.</span></div>
+    {% if alerts %}
+    <div class="card table-wrap" style="padding:4px 6px">
+      <table>
+        <tr><th>Day</th><th>Rule</th><th>Item</th><th>What happened</th></tr>
+        {% for a in alerts %}
+        <tr>
+          <td class="mono">{{ a.created_on }}</td>
+          <td><span class="tag">{{ a.rule }}</span></td>
+          <td>{% if a.url %}<a href="{{ a.url }}" rel="noopener">{{ a.name }}</a>{% else %}{{ a.name }}{% endif %}</td>
+          <td>{{ a.message }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% else %}
+    <p class="card muted">No alerts yet. The first run sets the baseline; changes are detected from the second day on.</p>
+    {% endif %}
+  </section>
+
+  {% if last_run_sources %}
+  <section>
+    <div class="section-head"><h2>Last run</h2><span class="muted">Each source runs in isolation: one failing site never loses the others' data.</span></div>
+    <div class="card table-wrap" style="padding:4px 6px">
+      <table>
+        <tr><th>Source</th><th>Status</th><th>Items</th><th>Duration</th></tr>
+        {% for r in last_run_sources %}
+        <tr>
+          <td class="mono">{{ r.source }}</td>
+          <td><span class="dot {{ 'failed' if r.status == 'failed' else '' }}" style="display:inline-block;margin-right:6px"></span>{{ r.status }}{% if r.error %} <span class="muted">· {{ r.error }}</span>{% endif %}</td>
+          <td>{{ r["items"] }}</td>
+          <td>{{ "%.1f" | format(r.duration_ms / 1000) }}s</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <footer class="muted">
+    Refreshed daily by GitHub Actions · page generated {{ generated_at }} ·
+    <a href="{{ repo_url }}">source code</a> · built by <a href="https://davicoelho-comercial.vercel.app">Davi Coelho</a>
+  </footer>
+</main>
+</body>
+</html>

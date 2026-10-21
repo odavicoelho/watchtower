@@ -171,6 +171,28 @@ class Storage:
         ).fetchall()
         return [_to_observation(row) for row in rows]
 
+    def sources(self) -> list[str]:
+        return [
+            row[0] for row in self._db.execute("SELECT DISTINCT source FROM observations ORDER BY source")
+        ]
+
+    def run_sources(self, run_id: int) -> list[sqlite3.Row]:
+        return self._db.execute(
+            "SELECT * FROM run_sources WHERE run_id = ? ORDER BY source", (run_id,)
+        ).fetchall()
+
+    def stats(self) -> dict[str, int | str | None]:
+        row = self._db.execute(
+            """
+            SELECT (SELECT COUNT(*) FROM runs WHERE status != 'running') AS runs,
+                   (SELECT MIN(observed_on) FROM observations)            AS first_day,
+                   (SELECT COUNT(DISTINCT observed_on) FROM observations) AS days,
+                   (SELECT COUNT(*) FROM observations)                    AS observations,
+                   (SELECT COUNT(*) FROM alerts)                          AS alerts
+            """
+        ).fetchone()
+        return dict(row)
+
     def runs(self, limit: int = 20) -> list[sqlite3.Row]:
         return self._db.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
 

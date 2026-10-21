@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from watchtower import config as config_module
-from watchtower import notifiers, pipeline, rules, sources
+from watchtower import dashboard, notifiers, pipeline, rules, sources
 from watchtower.http import HttpClient
 from watchtower.storage import Storage
 
@@ -53,6 +53,21 @@ def run(config: ConfigOption = Path("config.yaml")) -> None:
         typer.echo(f"  notifier failed: {failure}", err=True)
     if result.status != "ok":
         raise typer.Exit(code=1)
+
+
+@app.command()
+def report(
+    config: ConfigOption = Path("config.yaml"),
+    out: Annotated[Path, typer.Option("--out", "-o", help="Output directory")] = Path("site"),
+) -> None:
+    """Build the static dashboard from the database."""
+    cfg = config_module.load(config)
+    storage = Storage(cfg.database)
+    try:
+        path = dashboard.write(storage, out)
+    finally:
+        storage.close()
+    typer.echo(f"dashboard written to {path}")
 
 
 @app.command("sources")
