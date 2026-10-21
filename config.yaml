@@ -1,0 +1,14 @@
+# Watchtower configuration. Every source listed here is fetched on each run.
+user_agent: "watchtower/0.1 (+https://github.com/odavicoelho/watchtower)"
+database: data/watchtower.db
+
+http:
+  timeout: 20
+  retries: 3
+  backoff_seconds: 1
+  delay_seconds: 1  # be polite: at most one request per second per site
+
+sources:
+  - type: books_toscrape
+    options:
+      max_pages: 50  # the whole catalogue: 1,000 books
