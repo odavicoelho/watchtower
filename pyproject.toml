@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "respx>=0.22", "ruff>=0.9", "mypy>=1.14", "types-PyYAML"]
+dev = ["pytest>=8", "respx>=0.22", "ruff==0.17.1", "mypy>=1.14", "types-PyYAML"]
 
 [project.scripts]
 watchtower = "watchtower.cli:app"

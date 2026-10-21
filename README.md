@@ -74,14 +74,17 @@ notifiers:
 from watchtower.models import Record
 from watchtower.sources.base import Source, register
 
+
 @register
 class MyShop(Source):
     name = "my_shop"
 
     def fetch(self, http):
         data = http.get("https://example.com/api/products").json()
-        return [Record(source=self.name, key=p["sku"], name=p["title"], value=p["price"], unit="BRL")
-                for p in data]
+        return [
+            Record(source=self.name, key=p["sku"], name=p["title"], value=p["price"], unit="BRL")
+            for p in data
+        ]
 ```
 
 Then list it in `config.yaml` (`- type: my_shop`), and the rules, storage, alerts and dashboard work with it unchanged.
