@@ -30,7 +30,7 @@ A small, production-style **web monitoring pipeline**. On a schedule, it collect
  HTML / API    pydantic           │ history                │ console │
  adapters      models             ▼                        └─────────┘
                             ┌───────────┐
-                            │ Dashboard │  static HTML → Vercel
+                            │ Dashboard │  static HTML → GitHub Pages
                             └───────────┘
    Scheduler: GitHub Actions cron (daily) · Local: `watchtower run`
 ```
