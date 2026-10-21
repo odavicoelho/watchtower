@@ -1,90 +1,74 @@
-# P2 · Watchtower: architecture proposal
+# Watchtower · Architecture
 
-> Status: **approved 2026-10-21.** Milestone 1 done.
+## What it is
+A small, production-style **web monitoring pipeline**. On a schedule, it collects data from websites and APIs, keeps the full history, detects changes (price drops, value jumps, new items, stock changes, thresholds crossed), sends alerts and publishes a dashboard.
 
-## 1. What it is
-A small, production-style **web monitoring pipeline**. On a schedule, it collects data from websites and APIs, stores the full history, detects changes (price drops, new items, items out of stock, value thresholds), sends alerts, and publishes a public dashboard.
+## The live deployment
+- Runs **daily, automatically, at no cost** on GitHub Actions.
+- Three sources:
+  1. **Banco Central do Brasil (PTAX)**: official USD and EUR closing rates, from a public JSON API.
+  2. **Kraken public API**: BTC, ETH and SOL prices. (CoinGecko was considered first, but its `robots.txt` disallows `/api/v3`, so it was replaced rather than forced.)
+  3. **books.toscrape.com**: a bookstore built for scraping practice. HTML scraping with pagination, price and stock tracking.
+- A **public dashboard** on GitHub Pages: latest values, price history sparklines, the alert log and the status of the last run.
+- **Alerts as GitHub Issues**: GitHub emails everyone watching the repository, with no secrets to manage.
 
-**Why this project:** it's what the most common small freelance jobs ask for: "scrape this site", "watch these prices", "alert me when X changes", "save it to a spreadsheet or database". A client sees it running live and thinks "I need exactly that, for my site".
-
-## 2. What the demo will show (live and public)
-- Runs **daily, automatically, for free** on GitHub Actions
-- Three real sources:
-  1. **books.toscrape.com**, a site made for scraping practice, so there are no terms-of-service issues: HTML scraping, pagination, price and stock tracking
-  2. **Banco Central do Brasil (PTAX)** USD and EUR rates, a free public API: JSON source with threshold alerts
-  3. **Kraken public API** BTC, ETH and SOL prices: data that really changes, so alerts fire in the live demo. CoinGecko was the first choice, but its robots.txt disallows `/api/v3`.
-- A **public dashboard** (static page on GitHub Pages): latest values, price history charts, a change log, and "last run / runs so far" as proof it's alive
-- **Alerts** when a rule fires (see decision 3)
-
-## 3. Architecture
+## Architecture
 
 ```
             ┌──────────── config.yaml ────────────┐
             │ sources · rules · notifiers          │
             └──────────────────┬───────────────────┘
                                ▼
-┌─────────┐   ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌─────────┐
-│ Sources │──▶│ Validate │──▶│  Store   │──▶│  Diff + │──▶│ Notify  │
-│ (fetch) │   │ normalize│   │ (SQLite) │   │  rules  │   │ GH issue│
-└─────────┘   └──────────┘   └────┬─────┘   └─────────┘   │ webhook │
- HTML / API    pydantic           │ history                │ console │
- adapters      models             ▼                        └─────────┘
+┌─────────┐   ┌──────────┐   ┌──────────┐   ┌─────────┐   ┌──────────────┐
+│ Sources │──▶│ Validate │──▶│  Store   │──▶│  Diff + │──▶│   Notify     │
+│ (fetch) │   │ normalize│   │ (SQLite) │   │  rules  │   │ GitHub issue │
+└─────────┘   └──────────┘   └────┬─────┘   └─────────┘   │ email·webhook│
+ HTML / API    pydantic           │ history                │ console      │
+ adapters      models             ▼                        └──────────────┘
                             ┌───────────┐
                             │ Dashboard │  static HTML → GitHub Pages
                             └───────────┘
    Scheduler: GitHub Actions cron (daily) · Local: `watchtower run`
 ```
 
-### Components
+## Components
 | Component | Responsibility | Design choice |
 |---|---|---|
-| **Source adapters** | Fetch raw data from one site or API and return records | One small interface (`fetch() -> list[Record]`); new sites plug in without touching the pipeline. This is the part reused for client work. |
-| **Validation** | Parse, type-check and normalize (prices, currencies, dates) | `pydantic` models: bad data fails loudly instead of corrupting history |
-| **Storage** | Append-only snapshots plus "latest state" per item | **SQLite**: zero setup, one file, versioned in the repo's data branch. Client projects can swap in PostgreSQL. |
-| **Diff + rules** | Compare each run with the previous one; evaluate rules (`price_drop >= 10%`, `new_item`, `out_of_stock`, `value > X`) | Rules declared in YAML, so they're changeable without code |
-| **Notifiers** | Deliver fired alerts | GitHub Issues, email (SMTP), webhook (Slack/Discord) and console; same interface, easy to add more |
-| **Dashboard** | Static report generated after each run | Jinja2 + inline SVG sparklines → one HTML file. Free hosting on GitHub Pages, nothing to keep running |
-| **Scheduler** | Run daily | GitHub Actions cron. Free, and its logs are public proof the system works |
+| **Source adapters** | Fetch one site or API and return records | One small interface (`fetch() -> list[Record]`) and a registry; a new site plugs in without touching the pipeline |
+| **HTTP client** | Every request | Retries with exponential backoff, timeouts, at most one request per second per host, `robots.txt` respected, clear User-Agent |
+| **Validation** | Parse and normalize | `pydantic` records with `Decimal` values: bad data fails loudly instead of corrupting the history |
+| **Storage** | One observation per item per day, plus a log of every run and alert | **SQLite**: zero setup, one file. Same-day reruns update instead of duplicating |
+| **Rules** | Compare each item with its previous day | `price_drop`, `value_rise`, `new_item`, `stock_change`, `threshold`, declared in YAML. They fire on transitions only; a source's first run is a silent baseline |
+| **Notifiers** | Deliver alerts | GitHub Issues, SMTP email, webhook (Slack/Discord) and console behind one interface. Secrets only from environment variables; one failing channel never blocks the others |
+| **Dashboard** | Static page rebuilt after each run | Jinja2 + inline SVG sparklines: one HTML file, no JavaScript |
+| **Scheduler** | Run daily | GitHub Actions cron. The database is restored from, and saved back to, a single-commit `data` branch |
 
-### Reliability (what makes it look professional)
-- Retries with exponential backoff and timeouts; rate limiting between requests
-- Respects `robots.txt`; identifies itself with a clear User-Agent
-- Idempotent runs: re-running the same day doesn't duplicate data
-- Structured logs; each run records its status, duration and item counts
-- Tests with **recorded HTML/JSON fixtures**, so they never hit the network in CI
-- Lint and type checks (ruff, mypy) in CI
+## Reliability
+- Each source runs in isolation: a failing site marks the run *partial* without losing the other sources' data.
+- Idempotent runs: re-running on the same day never duplicates observations or alerts.
+- Each run records its status, duration and item counts per source.
+- 48 tests run offline against **recorded HTML/JSON fixtures**, so CI never depends on the network.
+- `ruff` and `mypy --strict` in CI.
 
-## 4. Stack
-Python 3.12 · httpx · selectolax (fast HTML parsing) · pydantic · SQLite · Typer (CLI) · Jinja2 · pytest · ruff · mypy · GitHub Actions · GitHub Pages. **Cost: $0.**
-
-## 5. Repo layout
+## Repository layout
 ```
 watchtower/
 ├── src/watchtower/
-│   ├── sources/        # base.py, books_toscrape.py, bcb_ptax.py, kraken.py
-│   ├── models.py       # pydantic records
-│   ├── storage.py      # SQLite repository
-│   ├── rules.py        # diff + rule engine
-│   ├── notifiers/      # telegram.py, webhook.py, console.py
-│   ├── dashboard/      # Jinja templates
-│   ├── pipeline.py     # orchestrates one run
-│   └── cli.py          # `watchtower run | report | sources`
-├── tests/              # unit tests + fixtures
-├── config.yaml
-├── .github/workflows/  # ci.yml, daily.yml
-└── README.md           # architecture diagram, how to run, how to add a source
+│   ├── sources/          # base.py (interface + registry), books_toscrape.py, bcb_ptax.py, kraken.py
+│   ├── http.py           # polite HTTP client
+│   ├── models.py         # pydantic records
+│   ├── storage.py        # SQLite: observations, runs, alerts
+│   ├── rules.py          # change detection
+│   ├── notifiers.py      # GitHub Issues, email, webhook, console
+│   ├── pipeline.py       # one run, end to end
+│   ├── dashboard.py      # builds the static page
+│   ├── templates/        # dashboard.html
+│   └── cli.py            # `watchtower run | report | sources`
+├── tests/                # unit tests + recorded fixtures
+├── config.yaml           # local configuration
+├── config.demo.yaml      # the live deployment
+└── .github/workflows/    # ci.yml, daily.yml
 ```
 
-## 6. Milestones (~5–7 days of work)
-1. Skeleton, models, books.toscrape source, SQLite storage, CLI `run` → data in the DB
-2. Diff + rules + console, GitHub Issues, email and webhook notifiers
-3. BCB PTAX source + threshold rule
-4. Dashboard + GitHub Pages deploy
-5. GitHub Actions daily run + CI, tests, README with diagram → **release**, then add to site, LinkedIn and Fiverr gig 1
-
-## 7. Decisions (Davi, 2026-10-21)
-1. **Name:** Watchtower
-2. **Sources:** books.toscrape + BCB PTAX + Kraken (swapped in for CoinGecko, whose robots.txt blocks its API)
-3. **Alerts:** no Telegram. Proposed: **GitHub Issues** for the live demo (GitHub emails the alert; zero secrets), plus **email (SMTP)** and **webhook** notifiers built for client use. Confirmed.
-4. **Storage:** SQLite
-5. **Repo:** public, `odavicoelho/watchtower`
+## Stack
+Python 3.12 · httpx · selectolax · pydantic · SQLite · Typer · Jinja2 · pytest · respx · ruff · mypy · GitHub Actions · GitHub Pages
